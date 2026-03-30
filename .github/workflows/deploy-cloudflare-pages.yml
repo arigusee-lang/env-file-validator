@@ -1,0 +1,80 @@
+name: Deploy Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: cloudflare-pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
+      DEPLOY_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}
+      VITE_ADSENSE_CLIENT: ${{ vars.VITE_ADSENSE_CLIENT }}
+      VITE_ADSENSE_SLOT_A: ${{ vars.VITE_ADSENSE_SLOT_A }}
+      VITE_ADSENSE_SLOT_B: ${{ vars.VITE_ADSENSE_SLOT_B }}
+      VITE_ADSENSE_SLOT_C: ${{ vars.VITE_ADSENSE_SLOT_C }}
+
+    steps:
+      - name: Validate required configuration
+        shell: bash
+        run: |
+          if [ -z "${CLOUDFLARE_PAGES_PROJECT_NAME}" ]; then
+            echo "::error::Missing repository variable CLOUDFLARE_PAGES_PROJECT_NAME."
+            exit 1
+          fi
+
+          if [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::Missing repository secret CLOUDFLARE_ACCOUNT_ID."
+            exit 1
+          fi
+
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "::error::Missing repository secret CLOUDFLARE_API_TOKEN."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Build application
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: >-
+            pages deploy dist
+            --project-name=${{ env.CLOUDFLARE_PAGES_PROJECT_NAME }}
+            --branch=${{ env.DEPLOY_BRANCH }}
