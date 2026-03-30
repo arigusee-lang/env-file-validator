@@ -82,6 +82,7 @@ Production team"
 ];
 
 const demoEnvironmentFilenames = ['.env.dev', '.env.qa', '.env.prod'];
+const SITE_URL = 'https://envvalidator.com/';
 
 const environmentFilenameSuggestions = [
   '.env.local',
@@ -181,8 +182,17 @@ type GroupedEnvironmentResult = {
   lines: number[];
 };
 
+declare global {
+  interface Window {
+    googlefc?: {
+      callbackQueue?: Array<Record<string, () => void>>;
+      showRevocationMessage?: () => void;
+    };
+  }
+}
+
 function setMetadata() {
-  document.title = 'Validate .env Files Against a Template';
+  document.title = '.env File Validator - Compare .env Files Against .env.example';
 
   let description = document.querySelector<HTMLMetaElement>(
     'meta[name="description"]',
@@ -195,7 +205,7 @@ function setMetadata() {
   }
 
   description.content =
-    'Compare .env.local, .env.dev, .env.qa, and .env.prod files against a public .env.example template in your browser.';
+    'Validate .env.local, .env.dev, .env.qa, and .env.prod against your .env.example template. Find missing keys, extra keys, duplicates, malformed lines, and warnings in the browser.';
 
   let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
 
@@ -205,7 +215,7 @@ function setMetadata() {
     document.head.appendChild(canonical);
   }
 
-  canonical.href = window.location.href;
+  canonical.href = SITE_URL;
 }
 
 function getInitialTheme(): ThemeMode {
@@ -814,6 +824,8 @@ function App() {
   const [renameDraft, setRenameDraft] = useState('');
   const [hoveredLines, setHoveredLines] = useState<HoverTarget>(() => buildHoverTarget());
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
+  const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState(false);
+  const [isPrivacyChoicesAvailable, setIsPrivacyChoicesAvailable] = useState(false);
   const [fullscreenLayout, setFullscreenLayout] = useState<FullscreenLayoutMode>('grid');
   const [fullscreenColumnRatio, setFullscreenColumnRatio] = useState(50);
   const [fullscreenRowRatio, setFullscreenRowRatio] = useState(50);
@@ -839,6 +851,18 @@ function App() {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('env-validator-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    window.googlefc = window.googlefc || {};
+    window.googlefc.callbackQueue = window.googlefc.callbackQueue || [];
+    window.googlefc.callbackQueue.push({
+      CONSENT_API_READY: () => {
+        setIsPrivacyChoicesAvailable(
+          typeof window.googlefc?.showRevocationMessage === 'function',
+        );
+      },
+    });
+  }, []);
 
   useEffect(() => {
     document.documentElement.style.overflow = isWorkspaceExpanded ? 'hidden' : '';
@@ -1792,6 +1816,10 @@ function App() {
     modal.scrollTop += event.deltaY;
   }
 
+  function handleOpenPrivacyChoices() {
+    window.googlefc?.showRevocationMessage?.();
+  }
+
   function renderWorkspace(fullscreen = false) {
     const widgetCount = parsedEnvironments.length + 1;
     const fullscreenGridStyle = {
@@ -2297,6 +2325,81 @@ function App() {
         </div>
       ) : null}
 
+      {isPrivacyPolicyOpen ? (
+        <div
+          className="policy-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="privacy-policy-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setIsPrivacyPolicyOpen(false);
+            }
+          }}
+        >
+          <div className="policy-modal__panel">
+            <div className="policy-modal__header">
+              <div>
+                <p className="policy-modal__eyebrow">Privacy</p>
+                <h2 id="privacy-policy-title">Privacy Policy</h2>
+              </div>
+              <button
+                type="button"
+                className="theme-toggle"
+                onClick={() => setIsPrivacyPolicyOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="policy-modal__content">
+              <section className="policy-modal__section">
+                <h3>Local processing</h3>
+                <p>
+                  Env text pasted into this validator is parsed and compared locally in your
+                  browser. The core validation flow does not require an account or server-side file
+                  upload.
+                </p>
+              </section>
+
+              <section className="policy-modal__section">
+                <h3>Advertising</h3>
+                <p>
+                  This site may use Google AdSense to display ads. Google may use cookies or
+                  similar technologies to measure ads, prevent fraud, and serve advertising content
+                  depending on region-specific requirements and the choices a visitor makes.
+                </p>
+              </section>
+
+              <section className="policy-modal__section">
+                <h3>Consent and privacy choices</h3>
+                <p>
+                  Where required, consent and privacy choices are handled through Google Funding
+                  Choices. If a privacy settings link is shown on this page, you can use it to
+                  review or update your advertising choices.
+                </p>
+              </section>
+
+              <section className="policy-modal__section">
+                <h3>Third-party services</h3>
+                <p>
+                  Google may act as a third-party advertising and privacy messaging provider. Review
+                  Google&apos;s policies for details about how Google processes advertising data.
+                </p>
+              </section>
+
+              <section className="policy-modal__section">
+                <h3>Launch note</h3>
+                <p>
+                  This draft policy is intended for envvalidator.com. Before production ads go
+                  live, replace it with your final publisher name and contact details.
+                </p>
+              </section>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="page-shell">
         <header className="hero">
           <div className="hero__headline">
@@ -2464,6 +2567,25 @@ function App() {
             minHeight={132}
           />
         </section>
+
+        <footer className="site-footer">
+          <button
+            type="button"
+            className="site-footer__link"
+            onClick={() => setIsPrivacyPolicyOpen(true)}
+          >
+            Privacy Policy
+          </button>
+          {isPrivacyChoicesAvailable ? (
+            <button
+              type="button"
+              className="site-footer__link"
+              onClick={handleOpenPrivacyChoices}
+            >
+              Privacy &amp; cookie settings
+            </button>
+          ) : null}
+        </footer>
       </div>
     </>
   );

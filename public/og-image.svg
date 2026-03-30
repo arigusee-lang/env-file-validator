@@ -1,0 +1,27 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" rx="28" fill="#F5EFE3"/>
+  <rect x="28" y="28" width="1144" height="574" rx="24" fill="#FFFCF7" stroke="#D9D0C2"/>
+  <rect x="68" y="76" width="340" height="38" rx="19" fill="#E1F3EF"/>
+  <text x="95" y="100" fill="#0F766E" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">.env FILE VALIDATOR</text>
+  <text x="68" y="178" fill="#1E2730" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700">Compare .env files against</text>
+  <text x="68" y="238" fill="#1E2730" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700">one .env.example template</text>
+  <text x="68" y="292" fill="#5C6772" font-family="Segoe UI, Arial, sans-serif" font-size="28">Find missing keys, extra keys, duplicates, malformed lines, and warnings.</text>
+
+  <rect x="68" y="356" width="480" height="198" rx="22" fill="#FBF6EC" stroke="#D9D0C2"/>
+  <text x="94" y="398" fill="#5C6772" font-family="Consolas, 'Courier New', monospace" font-size="20">.env.example</text>
+  <text x="94" y="442" fill="#0F766E" font-family="Consolas, 'Courier New', monospace" font-size="24" font-weight="700">API_URL</text>
+  <text x="200" y="442" fill="#7A4B2D" font-family="Consolas, 'Courier New', monospace" font-size="24">=</text>
+  <text x="94" y="478" fill="#0F766E" font-family="Consolas, 'Courier New', monospace" font-size="24" font-weight="700">JWT_SECRET</text>
+  <text x="242" y="478" fill="#7A4B2D" font-family="Consolas, 'Courier New', monospace" font-size="24">=</text>
+  <text x="94" y="514" fill="#0F766E" font-family="Consolas, 'Courier New', monospace" font-size="24" font-weight="700">LOG_LEVEL</text>
+  <text x="222" y="514" fill="#7A4B2D" font-family="Consolas, 'Courier New', monospace" font-size="24">=info</text>
+
+  <rect x="594" y="356" width="512" height="198" rx="22" fill="#17202A"/>
+  <text x="620" y="398" fill="#9AA8B7" font-family="Consolas, 'Courier New', monospace" font-size="20">.env.dev, .env.qa, .env.prod</text>
+  <text x="620" y="442" fill="#29E0C6" font-family="Consolas, 'Courier New', monospace" font-size="24" font-weight="700">API_URL</text>
+  <text x="726" y="442" fill="#FFD6AB" font-family="Consolas, 'Courier New', monospace" font-size="24">=https://api.example.com</text>
+  <text x="620" y="478" fill="#29E0C6" font-family="Consolas, 'Courier New', monospace" font-size="24" font-weight="700">JWT_SECRET</text>
+  <text x="768" y="478" fill="#FF8AA7" font-family="Consolas, 'Courier New', monospace" font-size="24">=</text>
+  <text x="620" y="514" fill="#29E0C6" font-family="Consolas, 'Courier New', monospace" font-size="24" font-weight="700">FEATURE_FLAG_NEW_HOME</text>
+  <text x="930" y="514" fill="#FFD6AB" font-family="Consolas, 'Courier New', monospace" font-size="24">=true</text>
+</svg>
