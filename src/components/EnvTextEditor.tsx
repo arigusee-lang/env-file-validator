@@ -135,6 +135,54 @@ function getAssignmentParts(raw: string) {
   };
 }
 
+function getContinuationParts(raw: string) {
+  let closingQuoteIndex = -1;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const character = raw[index];
+
+    if (
+      (character === '"' || character === "'" || character === '`') &&
+      raw[index - 1] !== '\\'
+    ) {
+      closingQuoteIndex = index;
+      break;
+    }
+  }
+
+  if (closingQuoteIndex === -1) {
+    return {
+      valuePart: raw,
+      commentPart: '',
+    };
+  }
+
+  const trailingText = raw.slice(closingQuoteIndex + 1);
+  const hashIndex = trailingText.indexOf('#');
+
+  if (hashIndex === -1 || trailingText.slice(0, hashIndex).trim().length > 0) {
+    return {
+      valuePart: raw,
+      commentPart: '',
+    };
+  }
+
+  const commentStartIndex = (() => {
+    let startIndex = closingQuoteIndex + 1 + hashIndex;
+
+    while (startIndex > closingQuoteIndex + 1 && /\s/.test(raw[startIndex - 1] ?? '')) {
+      startIndex -= 1;
+    }
+
+    return startIndex;
+  })();
+
+  return {
+    valuePart: raw.slice(0, commentStartIndex),
+    commentPart: raw.slice(commentStartIndex),
+  };
+}
+
 export function EnvTextEditor({
   value,
   parsed,
@@ -270,6 +318,8 @@ export function EnvTextEditor({
               }
 
               if (line.kind === 'continuation') {
+                const { valuePart, commentPart } = getContinuationParts(line.raw);
+
                 return (
                   <div
                     key={line.lineNumber}
@@ -278,8 +328,11 @@ export function EnvTextEditor({
                     }`}
                   >
                     <span className="editor-token editor-token--value">
-                      {line.raw.length === 0 ? ' ' : line.raw}
+                      {valuePart.length === 0 ? ' ' : valuePart}
                     </span>
+                    {commentPart ? (
+                      <span className="editor-token editor-token--comment">{commentPart}</span>
+                    ) : null}
                   </div>
                 );
               }

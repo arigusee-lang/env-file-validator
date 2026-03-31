@@ -74,6 +74,15 @@ describe('env compare core logic', () => {
     );
   });
 
+  it('treats trailing characters after a closing quote as malformed', () => {
+    const parsed = parseEnv(['JWT_SECRET="abc"junk'].join('\n'), 'env');
+
+    expect(parsed.validEntries).toHaveLength(0);
+    expect(parsed.effectiveEntries).toHaveLength(0);
+    expect(parsed.issues.some((issue) => issue.code === 'malformed_line')).toBe(true);
+    expect(parsed.issues.some((issue) => issue.message.includes('closing quote'))).toBe(true);
+  });
+
   it('does not count multiline template defaults as missing', () => {
     const template = parseEnv(
       ['PRIVATE_KEY="-----BEGIN KEY-----', 'abc123', '-----END KEY-----"'].join('\n'),
@@ -161,6 +170,26 @@ describe('env compare core logic', () => {
     ]);
     expect(result.environments[0].malformedLines.some((issue) => issue.code === 'empty_unquoted_value')).toBe(true);
     expect(result.environments[0].warnings).toHaveLength(0);
+  });
+
+  it('treats a later invalid duplicate assignment as overriding the earlier valid one', () => {
+    const template = parseEnv(['JWT_SECRET='].join('\n'), 'template');
+    const env = parseEnv(['JWT_SECRET=ok', 'JWT_SECRET='].join('\n'), 'env');
+    const result = compareEnvFiles(template, [
+      {
+        id: 'env-1',
+        label: 'Environment 1',
+        filename: '.env.dev',
+        parsed: env,
+      },
+    ]);
+
+    expect(result.environments[0].missingRequiredKeys.map((entry) => entry.key)).toEqual([
+      'JWT_SECRET',
+    ]);
+    expect(result.environments[0].duplicateKeys).toHaveLength(1);
+    expect(result.environments[0].duplicateKeys[0]?.lines).toEqual([1, 2]);
+    expect(result.environments[0].malformedLines.some((issue) => issue.code === 'empty_unquoted_value')).toBe(true);
   });
 
   it('generates a stripped template from valid keys', () => {

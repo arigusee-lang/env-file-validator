@@ -55,16 +55,34 @@ function normalizeParsedValue(value: string) {
     const closingQuoteIndex = findClosingQuoteIndex(trimmedStart, quote, 1);
 
     if (closingQuoteIndex !== -1) {
-      return trimmedStart.slice(0, closingQuoteIndex + 1);
+      const trailingText = trimmedStart.slice(closingQuoteIndex + 1);
+      const trailingCommentIndex = trailingText.indexOf('#');
+      const trailingValueSegment =
+        trailingCommentIndex === -1
+          ? trailingText
+          : trailingText.slice(0, trailingCommentIndex);
+      const hasTrailingJunk =
+        trailingText.trim().length > 0 && trailingValueSegment.trim().length > 0;
+
+      return {
+        value: trimmedStart.slice(0, closingQuoteIndex + 1),
+        hasTrailingJunk,
+      };
     }
 
-    return value;
+    return {
+      value,
+      hasTrailingJunk: false,
+    };
   }
 
   const commentIndex = value.indexOf('#');
   const uncommentedValue = commentIndex === -1 ? value : value.slice(0, commentIndex);
 
-  return uncommentedValue.trim();
+  return {
+    value: uncommentedValue.trim(),
+    hasTrailingJunk: false,
+  };
 }
 
 function createIssue(
@@ -83,6 +101,7 @@ export function parseEnv(input: string, source: SourceFile): ParsedEnvFile {
   const lines: ParsedLine[] = [];
   const issues: LineIssue[] = [];
   const validEntries: EnvEntry[] = [];
+  const effectiveState = new Map<string, EnvEntry | null>();
   const seenByKey = new Map<string, EnvEntry[]>();
 
   for (let index = 0; index < rows.length; index += 1) {
@@ -131,6 +150,11 @@ export function parseEnv(input: string, source: SourceFile): ParsedEnvFile {
     const key = rawKeySegment.trim();
     const warnings: LineIssue[] = [];
     const rawLines = [raw];
+    const pushSeenEntry = (entry: EnvEntry) => {
+      const duplicates = seenByKey.get(entry.normalizedKey) ?? [];
+      duplicates.push(entry);
+      seenByKey.set(entry.normalizedKey, duplicates);
+    };
 
     if (hadLeadingWhitespace || rawKeySegment !== key) {
       const whitespaceIssue = createIssue(
@@ -190,6 +214,19 @@ export function parseEnv(input: string, source: SourceFile): ParsedEnvFile {
       }
 
       if (!foundClosingQuote) {
+        const unresolvedEntry: EnvEntry = {
+          key,
+          normalizedKey: key,
+          value,
+          lineNumber,
+          source,
+          raw: rawLines.join('\n'),
+          warnings: [],
+        };
+
+        pushSeenEntry(unresolvedEntry);
+        effectiveState.set(key, null);
+
         const unclosedQuotedValueIssue = createIssue(
           {
             code: 'malformed_line',
@@ -221,10 +258,58 @@ export function parseEnv(input: string, source: SourceFile): ParsedEnvFile {
       }
     }
 
-    value = normalizeParsedValue(value);
+    const normalizedValue = normalizeParsedValue(value);
+    value = normalizedValue.value;
     const trimmedValue = value.trim();
 
+    const assignmentEntry: EnvEntry = {
+      key,
+      normalizedKey: key,
+      value,
+      lineNumber,
+      source,
+      raw: rawLines.join('\n'),
+      warnings,
+    };
+
+    if (normalizedValue.hasTrailingJunk) {
+      pushSeenEntry(assignmentEntry);
+      effectiveState.set(key, null);
+
+      const trailingCharactersIssue = createIssue(
+        {
+          code: 'malformed_line',
+          severity: 'error',
+          message: 'Unexpected characters found after the closing quote.',
+          lineNumber,
+          raw: rawLines.join('\n'),
+          key,
+        },
+        source,
+      );
+
+      lines.push({
+        kind: 'malformed',
+        lineNumber,
+        raw: rawLines[0],
+        issues: [trailingCharactersIssue],
+      });
+      rawLines.slice(1).forEach((continuationRaw, continuationIndex) => {
+        lines.push({
+          kind: 'malformed',
+          lineNumber: lineNumber + continuationIndex + 1,
+          raw: continuationRaw,
+          issues: [],
+        });
+      });
+      issues.push(trailingCharactersIssue);
+      continue;
+    }
+
     if (source === 'env' && trimmedValue.length === 0) {
+      pushSeenEntry(assignmentEntry);
+      effectiveState.set(key, null);
+
       const emptyUnquotedValueIssue = createIssue(
         {
           code: 'empty_unquoted_value',
@@ -274,16 +359,6 @@ export function parseEnv(input: string, source: SourceFile): ParsedEnvFile {
       issues.push(emptyValueIssue);
     }
 
-    const entry: EnvEntry = {
-      key,
-      normalizedKey: key,
-      value,
-      lineNumber,
-      source,
-      raw: rawLines.join('\n'),
-      warnings,
-    };
-
     lines.push({
       kind: 'assignment',
       lineNumber,
@@ -299,20 +374,20 @@ export function parseEnv(input: string, source: SourceFile): ParsedEnvFile {
         lineNumber: lineNumber + continuationIndex + 1,
         raw: continuationRaw,
         normalizedKey: key,
+        });
       });
-    });
-    validEntries.push(entry);
-
-    const duplicates = seenByKey.get(entry.normalizedKey) ?? [];
-    duplicates.push(entry);
-    seenByKey.set(entry.normalizedKey, duplicates);
+    validEntries.push(assignmentEntry);
+    pushSeenEntry(assignmentEntry);
+    effectiveState.set(key, assignmentEntry);
   }
 
   const duplicateMap = new Map<string, EnvEntry[]>();
   const keyMap = new Map<string, EnvEntry>();
 
-  validEntries.forEach((entry) => {
-    keyMap.set(entry.normalizedKey, entry);
+  effectiveState.forEach((entry, key) => {
+    if (entry) {
+      keyMap.set(key, entry);
+    }
   });
 
   seenByKey.forEach((entries, key) => {
