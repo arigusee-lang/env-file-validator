@@ -318,7 +318,9 @@ export function EnvTextEditor({
               }
 
               if (line.kind === 'continuation') {
-                const { valuePart, commentPart } = getContinuationParts(line.raw);
+                const continuationParts =
+                  line.renderParts ?? getContinuationParts(line.raw);
+                const { valuePart, commentPart } = continuationParts;
 
                 return (
                   <div
@@ -337,7 +339,13 @@ export function EnvTextEditor({
                 );
               }
 
-              const { keyPart, separator, valuePart, commentPart } = getAssignmentParts(line.raw);
+              if (line.kind !== 'assignment') {
+                return null;
+              }
+
+              const assignmentParts =
+                line.renderParts ?? getAssignmentParts(line.raw);
+              const { keyPart, separator, valuePart, commentPart } = assignmentParts;
 
               return (
                 <div

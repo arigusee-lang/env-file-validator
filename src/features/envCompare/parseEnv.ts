@@ -95,6 +95,27 @@ function createIssue(
   };
 }
 
+function getUnsupportedKeyCharacters(key: string) {
+  if (key.length === 0) {
+    return '=';
+  }
+
+  const invalidCharacters = new Set<string>();
+  const [firstCharacter = '', ...remainingCharacters] = Array.from(key);
+
+  if (!/[A-Za-z_]/.test(firstCharacter)) {
+    invalidCharacters.add(firstCharacter);
+  }
+
+  remainingCharacters.forEach((character) => {
+    if (!/[A-Za-z0-9_]/.test(character)) {
+      invalidCharacters.add(character);
+    }
+  });
+
+  return Array.from(invalidCharacters).join(', ');
+}
+
 export function parseEnv(input: string, source: SourceFile): ParsedEnvFile {
   const normalizedInput = normalizeInput(input);
   const rows = normalizedInput.split('\n');
@@ -173,11 +194,12 @@ export function parseEnv(input: string, source: SourceFile): ParsedEnvFile {
     }
 
     if (!VALID_KEY_PATTERN.test(key)) {
+      const unsupportedCharacters = getUnsupportedKeyCharacters(key);
       const invalidKeyIssue = createIssue(
         {
           code: 'invalid_key_name',
           severity: 'error',
-          message: 'Key name contains unsupported characters.',
+          message: `Key name contains unsupported characters (${unsupportedCharacters}).`,
           lineNumber,
           raw,
           key,

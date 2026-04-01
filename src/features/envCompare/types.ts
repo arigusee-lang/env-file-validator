@@ -44,12 +44,22 @@ export type ParsedLine =
       value: string;
       normalizedKey: string;
       warnings: LineIssue[];
+      renderParts?: {
+        keyPart: string;
+        separator: string;
+        valuePart: string;
+        commentPart?: string;
+      };
     }
   | {
       kind: 'continuation';
       lineNumber: number;
       raw: string;
       normalizedKey: string;
+      renderParts?: {
+        valuePart: string;
+        commentPart?: string;
+      };
     }
   | {
       kind: 'malformed';

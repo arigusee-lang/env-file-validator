@@ -18,103 +18,16 @@ import {
   type EditorTooltipDetail,
 } from './components/EnvTextEditor';
 import {
-  buildPlainTextReport,
-  compareEnvFiles,
-  parseEnv,
   type DuplicateGroup,
   type EnvironmentCompareResult,
   type LineIssue,
   type ParsedEnvFile,
 } from './features/envCompare';
-
-const demoTemplate = `# Public onboarding template
-API_URL=
-DB_HOST=localhost
-DB_PORT=5432
-JWT_SECRET=
-REDIS_URL=redis://localhost:6379
-LOG_LEVEL=info
-FEATURE_FLAG_NEW_HOME=false
-PUBLIC_TEXT="hello # world" # quoted hash is part of the value
-MULTILINE_BANNER="Welcome
-Team"
-OPTIONAL_NOTE=""
-`;
-
-const demoEnvironmentTexts = [
-  `# Local development
-API_URL=http://localhost:3000 # local api
-DB_HOST=localhost
-DB_PORT=5432
-JWT_SECRET=
-LOG_LEVEL=debug
-EXPERIMENT_FLAG=true
-API_URL=http://localhost:4000
-INVALID-NAME=value
-PUBLIC_TEXT="hello # local"
-MULTILINE_BANNER="Welcome
-Local team"
-`,
-  `# QA deployment
-API_URL=https://qa.example.com
-DB_HOST=qa-db.internal
-DB_PORT=5432
-JWT_SECRET=""
-REDIS_URL=redis://qa.internal:6379
-LOG_LEVEL=" "
-FEATURE_FLAG_NEW_HOME=true
-PUBLIC_TEXT="qa # banner"
-MULTILINE_BANNER="Welcome
-QA team" # multiline with trailing comment
-`,
-  `# Production deployment
-API_URL=https://api.example.com
-DB_HOST=prod-db.internal
-DB_PORT=5432
-JWT_SECRET=prod-secret
-REDIS_URL=redis://prod.internal:6379
-LOG_LEVEL=warn
-FEATURE_FLAG_NEW_HOME=false
-PUBLIC_TEXT="prod # banner"
-MULTILINE_BANNER="Welcome
-Production team"
-`,
-];
-
-const demoEnvironmentFilenames = ['.env.dev', '.env.qa', '.env.prod'];
-const SITE_URL = 'https://envvalidator.com/';
-
-const environmentFilenameSuggestions = [
-  '.env.local',
-  '.env.dev',
-  '.env.qa',
-  '.env.prod',
-  '.env.staging',
-  '.env.preview',
-];
-
-const faqItems = [
-  {
-    question: 'Does this tool upload any environment files?',
-    answer:
-      'No. Parsing, validation, and comparison all happen locally in the browser.',
-  },
-  {
-    question: 'What counts as a missing key?',
-    answer:
-      'Only template keys without default values count as missing. Defaulted template values are treated as optional fallbacks.',
-  },
-  {
-    question: 'Are template duplicates and malformed lines still validated?',
-    answer:
-      'Yes. Duplicate keys and malformed lines stay visible in the reference template and in every environment file.',
-  },
-  {
-    question: 'Which dotenv syntax is supported?',
-    answer:
-      'The validator covers common dotenv syntax: KEY=value assignments, export prefixes, inline comments, quoted values, quoted hashes, and multiline quoted values. Variable references like $NAME or ${NAME} are treated as plain string values and are not expanded at runtime.',
-  },
-];
+import {
+  canQuickFixPropertiesText,
+  quickFixPropertiesText,
+} from './features/propertiesCompare';
+import { getActiveValidatorPage } from './validatorPageConfig';
 
 type ThemeMode = 'light' | 'dark';
 type FullscreenLayoutMode = 'grid' | 'row';
@@ -182,6 +95,8 @@ type GroupedEnvironmentResult = {
   lines: number[];
 };
 
+const pageConfig = getActiveValidatorPage(window.location.pathname);
+
 declare global {
   interface Window {
     googlefc?: {
@@ -191,8 +106,20 @@ declare global {
   }
 }
 
+function upsertMeta(selector: string, attribute: 'name' | 'property', key: string, content: string) {
+  let element = document.querySelector<HTMLMetaElement>(selector);
+
+  if (!element) {
+    element = document.createElement('meta');
+    element.setAttribute(attribute, key);
+    document.head.appendChild(element);
+  }
+
+  element.content = content;
+}
+
 function setMetadata() {
-  document.title = '.env File Validator - Compare .env Files Against .env.example';
+  document.title = pageConfig.title;
 
   let description = document.querySelector<HTMLMetaElement>(
     'meta[name="description"]',
@@ -204,8 +131,7 @@ function setMetadata() {
     document.head.appendChild(description);
   }
 
-  description.content =
-    'Validate .env.local, .env.dev, .env.qa, and .env.prod against your .env.example template. Find missing keys, extra keys, duplicates, malformed lines, and warnings in the browser.';
+  description.content = pageConfig.description;
 
   let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
 
@@ -215,7 +141,20 @@ function setMetadata() {
     document.head.appendChild(canonical);
   }
 
-  canonical.href = SITE_URL;
+  canonical.href = pageConfig.canonicalUrl;
+
+  upsertMeta('meta[property="og:title"]', 'property', 'og:title', pageConfig.title);
+  upsertMeta('meta[property="og:description"]', 'property', 'og:description', pageConfig.description);
+  upsertMeta('meta[property="og:url"]', 'property', 'og:url', pageConfig.canonicalUrl);
+  upsertMeta('meta[property="og:image"]', 'property', 'og:image', pageConfig.ogImageUrl);
+  upsertMeta('meta[name="twitter:title"]', 'name', 'twitter:title', pageConfig.title);
+  upsertMeta(
+    'meta[name="twitter:description"]',
+    'name',
+    'twitter:description',
+    pageConfig.description,
+  );
+  upsertMeta('meta[name="twitter:image"]', 'name', 'twitter:image', pageConfig.ogImageUrl);
 }
 
 function getInitialTheme(): ThemeMode {
@@ -233,7 +172,7 @@ function makeId(prefix: string) {
 }
 
 function getEnvironmentFilename(index: number) {
-  return environmentFilenameSuggestions[index - 1] ?? `.env.extra-${index}`;
+  return pageConfig.getEnvironmentFilename(index);
 }
 
 function createEnvironment(index: number, text = '', loadedName?: string): EnvironmentTab {
@@ -259,16 +198,7 @@ function resequenceEnvironments(environments: EnvironmentTab[]) {
 }
 
 function isPreferredTemplateFilename(filename: string) {
-  const normalized = filename.trim().toLowerCase();
-
-  return (
-    normalized === '.env' ||
-    normalized === '.env.example' ||
-    normalized === 'env.local' ||
-    normalized === '.env.local' ||
-    normalized === 'env.dev' ||
-    normalized === '.env.dev'
-  );
+  return pageConfig.isPreferredTemplateFilename(filename);
 }
 
 function hasDraggedFiles(event: DragEvent<HTMLElement>) {
@@ -972,10 +902,10 @@ function App() {
     isWorkspaceExpanded,
   ]);
 
-  const parsedTemplate = parseEnv(templateText, 'template');
+  const parsedTemplate = pageConfig.parse(templateText, 'template');
   const templateLinesByKey = toLineMap(parsedTemplate);
   const parsedEnvironments = environments.map((environment) => {
-    const parsed = parseEnv(environment.text, 'env');
+    const parsed = pageConfig.parse(environment.text, 'env');
 
     return {
       ...environment,
@@ -984,7 +914,7 @@ function App() {
     };
   });
 
-  const comparison = compareEnvFiles(
+  const comparison = pageConfig.compare(
     parsedTemplate,
     parsedEnvironments.map((environment) => ({
       id: environment.id,
@@ -996,7 +926,13 @@ function App() {
   const comparisonByEnvironmentId = new Map(
     comparison.environments.map((environment) => [environment.id, environment]),
   );
-  const report = buildPlainTextReport(comparison);
+  const canQuickFixAllProperties =
+    pageConfig.id === 'properties' &&
+    (canQuickFixPropertiesText(templateText, parsedTemplate) ||
+      parsedEnvironments.some((environment) =>
+        canQuickFixPropertiesText(environment.text, environment.parsed),
+      ));
+  const report = pageConfig.buildReport(comparison);
   const templateIssuesByLine = groupIssuesByLine(parsedTemplate.issues);
   const environmentIssuesByLine = new Map(
     parsedEnvironments.map((environment) => [
@@ -1032,7 +968,7 @@ function App() {
   ) {
     const relatedLocations: string[] = [];
     const templateLines = templateLinesByKey.get(normalizedKey) ?? [];
-    const templateLabel = templateLoadedName ?? '.env.example';
+    const templateLabel = templateLoadedName ?? pageConfig.templateDefaultName;
     const relevantTemplateLines =
       source === 'template'
         ? templateLines.filter((currentLine) => currentLine !== lineNumber)
@@ -1237,7 +1173,7 @@ function App() {
       details.push({
         tone: 'warning',
         label: 'Warning',
-        text: 'No issues detected in this file.',
+                        text: 'No issues detected in this file.',
       });
     }
 
@@ -1329,14 +1265,14 @@ function App() {
       preferredColumn: 'left' as const,
       count: missingCount,
       element: (
-        <ResultSection
-          title="Missing required keys"
-          subtitle="Only template keys without default values are counted as missing."
-          items={missingItems}
-          emptyLabel="No required template keys are missing across the loaded environments."
-          count={missingCount}
-          tone="danger"
-        />
+          <ResultSection
+            title={pageConfig.missingSectionTitle}
+            subtitle={pageConfig.missingSubtitle}
+            items={missingItems}
+            emptyLabel={pageConfig.missingEmptyLabel}
+            count={missingCount}
+            tone="danger"
+          />
       ),
     },
     {
@@ -1344,12 +1280,12 @@ function App() {
       preferredColumn: 'left' as const,
       count: duplicateCount,
       element: (
-        <ResultSection
-          title="Duplicate keys"
-          subtitle="Duplicate keys remain visible in the template and in every environment file."
-          items={duplicateItems}
-          emptyLabel="No duplicate keys were detected."
-          count={duplicateCount}
+          <ResultSection
+            title={pageConfig.duplicateSectionTitle}
+            subtitle={pageConfig.duplicateSubtitle}
+            items={duplicateItems}
+            emptyLabel="No duplicate keys were detected."
+            count={duplicateCount}
           tone="danger"
         />
       ),
@@ -1359,12 +1295,12 @@ function App() {
       preferredColumn: 'right' as const,
       count: malformedCount,
       element: (
-        <ResultSection
-          title="Malformed lines"
-          subtitle="Only valid assignments participate in parity checks."
-          items={malformedItems}
-          emptyLabel="No malformed lines were detected."
-          count={malformedCount}
+          <ResultSection
+            title={pageConfig.malformedSectionTitle}
+            subtitle={pageConfig.malformedSubtitle}
+            items={malformedItems}
+            emptyLabel="No malformed lines were detected."
+            count={malformedCount}
           tone="danger"
         />
       ),
@@ -1374,12 +1310,12 @@ function App() {
       preferredColumn: 'right' as const,
       count: warningCount,
       element: (
-        <ResultSection
-          title="Warnings"
-          subtitle="Undocumented keys, whitespace issues, and explicit empty string literals stay separate from hard validation errors."
-          items={warningItems}
-          emptyLabel="No warnings were detected."
-          count={warningCount}
+          <ResultSection
+            title={pageConfig.warningsSectionTitle}
+            subtitle={pageConfig.warningsSubtitle}
+            items={warningItems}
+            emptyLabel="No warnings were detected."
+            count={warningCount}
           tone="warning"
         />
       ),
@@ -1568,7 +1504,11 @@ function App() {
 
     if (templateText.trim().length > 0) {
       filesToDownload.push({
-        filename: getDownloadFilename(templateLoadedName ?? '.env.example', 'template', '.env.example'),
+        filename: getDownloadFilename(
+          templateLoadedName ?? pageConfig.templateDefaultName,
+          'template',
+          pageConfig.templateDefaultName,
+        ),
         text: templateText,
       });
     }
@@ -1582,7 +1522,7 @@ function App() {
         filename: getDownloadFilename(
           environment.loadedName ?? environment.filename,
           environment.label,
-          `.env.${environment.label.replace(/\s+/g, '_')}`,
+          pageConfig.getDefaultEnvironmentDownloadName(environment.label),
         ),
         text: environment.text,
       });
@@ -1655,6 +1595,50 @@ function App() {
     setStatusMessage(`${environment?.loadedName ?? environment?.label ?? 'Environment'} removed.`);
   }
 
+  function handleQuickFixAllProperties() {
+    if (pageConfig.id !== 'properties') {
+      return;
+    }
+
+    const canFixTemplate = canQuickFixPropertiesText(templateText, parsedTemplate);
+    let fixedCount = canFixTemplate ? 1 : 0;
+    const nextTemplateText = canFixTemplate
+      ? quickFixPropertiesText(templateText, parsedTemplate)
+      : templateText;
+
+    const parsedEnvironmentMap = new Map(
+      parsedEnvironments.map((environment) => [environment.id, environment] as const),
+    );
+    const nextEnvironments = environments.map((environment) => {
+      const parsedEnvironment = parsedEnvironmentMap.get(environment.id);
+
+      if (
+        !parsedEnvironment ||
+        !canQuickFixPropertiesText(environment.text, parsedEnvironment.parsed)
+      ) {
+        return environment;
+      }
+
+      fixedCount += 1;
+
+      return {
+        ...environment,
+        text: quickFixPropertiesText(environment.text, parsedEnvironment.parsed),
+      };
+    });
+
+    if (fixedCount === 0) {
+      return;
+    }
+
+    startTransition(() => {
+      setTemplateText(nextTemplateText);
+      setEnvironments(nextEnvironments);
+    });
+
+    setStatusMessage(`Quick fix applied to ${fixedCount} file${fixedCount === 1 ? '' : 's'}.`);
+  }
+
   function handleClearAll() {
     const resetEnvironments = [createEnvironment(1)];
 
@@ -1667,12 +1651,12 @@ function App() {
   }
 
   function handleLoadDemo() {
-    const demoEnvironments = demoEnvironmentTexts.map((text, index) =>
-      createEnvironment(index + 1, text, demoEnvironmentFilenames[index]),
+    const demoEnvironments = pageConfig.demoEnvironmentTexts.map((text, index) =>
+      createEnvironment(index + 1, text, pageConfig.demoEnvironmentFilenames[index]),
     );
 
-    setTemplateText(demoTemplate);
-    setTemplateLoadedName('.env.example');
+    setTemplateText(pageConfig.demoTemplate);
+    setTemplateLoadedName(pageConfig.templateDefaultName);
     setEnvironments(demoEnvironments);
     setStatusMessage('Demo data loaded with three environment widgets.');
   }
@@ -1705,7 +1689,7 @@ function App() {
 
     setDropState({
       kind: 'bulk',
-      message: 'Drop files to auto-fill the template and env widgets.',
+      message: `Drop files to auto-fill the template and ${pageConfig.id === 'properties' ? 'properties' : 'env'} widgets.`,
     });
   }
 
@@ -1822,6 +1806,7 @@ function App() {
 
   function renderWorkspace(fullscreen = false) {
     const widgetCount = parsedEnvironments.length + 1;
+    const workspaceHintText = pageConfig.workspaceHint.replace(/\.$/, '');
     const fullscreenGridStyle = {
       gridTemplateColumns:
         widgetCount > 1
@@ -1854,27 +1839,17 @@ function App() {
         >
           <div className="editor-card__header">
             <div className="editor-card__title-wrap">
-              <h2>{templateLoadedName ?? '.env.example'}</h2>
+              <h2>{templateLoadedName ?? pageConfig.templateDefaultName}</h2>
             </div>
             <div className="editor-card__actions">
               <label className="button button--ghost">
-                Upload template
+                {pageConfig.templateUploadLabel}
                 <input
                   type="file"
+                  accept={pageConfig.fileInputAccept}
                   className="sr-only"
                   onChange={(event) => {
                     void handleTemplateUpload(event);
-                  }}
-                />
-              </label>
-              <label className="button button--ghost">
-                Upload all your env files
-                <input
-                  type="file"
-                  multiple
-                  className="sr-only"
-                  onChange={(event) => {
-                    void handleBulkUpload(event);
                   }}
                 />
               </label>
@@ -1897,14 +1872,11 @@ function App() {
             lineInteractions={templateLineInteractions}
             onHoverTargetChange={handleHoverStart}
             onChange={setTemplateText}
-            placeholder="API_URL="
+            placeholder={pageConfig.templatePlaceholder}
             ariaLabel="Reference template content"
           />
           <div className="editor-card__helper editor-card__helper--bottom">
-            {comparison.template.requiredKeys.length} required keys without defaults.
-            {' '}
-            {comparison.template.defaultedKeys.length} template defaults will not count as
-            missing.
+            {pageConfig.templateHelperText(comparison)}
           </div>
         </article>
       );
@@ -2024,6 +1996,7 @@ function App() {
                 Upload
                 <input
                   type="file"
+                  accept={pageConfig.fileInputAccept}
                   className="sr-only"
                   onChange={(event) => {
                     void handleEnvironmentUpload(event, environment.id);
@@ -2068,7 +2041,7 @@ function App() {
                 ),
               );
             }}
-            placeholder="API_URL=https://api.example.com"
+            placeholder={pageConfig.environmentPlaceholder}
             ariaLabel={`${environment.label} content`}
           />
         </article>
@@ -2161,7 +2134,21 @@ function App() {
         }}
       >
         <div className="workspace-toolbar">
-          <div className="workspace-toolbar__hint">Drag multiple env files here.</div>
+          <div className="workspace-toolbar__lead">
+            <label className="workspace-toolbar__upload-link">
+              {pageConfig.bulkUploadLabel}
+              <input
+                type="file"
+                multiple
+                accept={pageConfig.fileInputAccept}
+                className="sr-only"
+                onChange={(event) => {
+                  void handleBulkUpload(event);
+                }}
+              />
+            </label>
+            <span className="workspace-toolbar__hint-text">or {workspaceHintText}.</span>
+          </div>
           <div className="workspace-toolbar__actions">
             <IconButton
               label="+"
@@ -2283,7 +2270,7 @@ function App() {
     '@graph': [
       {
         '@type': 'SoftwareApplication',
-        name: 'Env Template Validator',
+        name: pageConfig.softwareApplicationName,
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Any',
         offers: {
@@ -2294,7 +2281,7 @@ function App() {
       },
       {
         '@type': 'FAQPage',
-        mainEntity: faqItems.map((item) => ({
+        mainEntity: pageConfig.faqItems.map((item) => ({
           '@type': 'Question',
           name: item.question,
           acceptedAnswer: {
@@ -2403,11 +2390,10 @@ function App() {
       <div className="page-shell">
         <header className="hero">
           <div className="hero__headline">
-            <div className="hero__title-wrap">
-              <h1>Validate multiple `.env` files against one `.env.example` template.</h1>
+              <div className="hero__title-wrap">
+              <h1>{pageConfig.heroTitle}</h1>
               <p className="hero__lede">
-                Check whether `.env.local`, `.env.dev`, `.env.qa`, and `.env.prod` match the keys
-                documented in your reference template.
+                {pageConfig.heroLede}
               </p>
             </div>
             <div className="hero__controls hero__controls--right">
@@ -2441,6 +2427,15 @@ function App() {
               </button>
             </div>
             <div className="action-bar__group">
+              {canQuickFixAllProperties ? (
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={handleQuickFixAllProperties}
+                >
+                  Quick fix
+                </button>
+              ) : null}
               <button type="button" className="button button--secondary" onClick={handleCopyReport}>
                 Copy text report
               </button>
@@ -2452,22 +2447,22 @@ function App() {
 
           <section className="summary-grid" aria-label="Validation summary">
             <SummaryCard
-              label="Environments"
+              label={pageConfig.summaryEnvironmentCountLabel}
               value={comparison.summary.environmentCount}
               tone="success"
             />
             <SummaryCard
-              label="Missing required"
+              label={pageConfig.summaryMissingLabel}
               value={comparison.summary.missingRequiredKeys}
               tone={comparison.summary.missingRequiredKeys > 0 ? 'danger' : 'success'}
             />
             <SummaryCard
-              label="Undocumented"
+              label={pageConfig.summaryUndocumentedLabel}
               value={comparison.summary.undocumentedKeys}
               tone={comparison.summary.undocumentedKeys > 0 ? 'warning' : 'success'}
             />
             <SummaryCard
-              label="Duplicate groups"
+              label={pageConfig.summaryDuplicateLabel}
               value={
                 comparison.summary.duplicateGroupsInEnvironments +
                 comparison.summary.duplicateGroupsInTemplate
@@ -2481,7 +2476,7 @@ function App() {
               }
             />
             <SummaryCard
-              label="Malformed lines"
+              label={pageConfig.summaryMalformedLabel}
               value={
                 comparison.summary.malformedInEnvironments +
                 comparison.summary.malformedInTemplate
@@ -2495,7 +2490,7 @@ function App() {
               }
             />
             <SummaryCard
-              label="Warnings"
+              label={pageConfig.summaryWarningsLabel}
               value={warningCount}
               tone={warningCount > 0 ? 'warning' : 'success'}
             />
@@ -2503,16 +2498,13 @@ function App() {
 
           {!hasAnyInput ? (
             <section className="empty-state">
-              <h3>Paste or upload a template and at least one environment file to start.</h3>
-              <p>
-                Add more tabs with the plus button if you want to compare local, QA, and
-                production files against the same reference contract.
-              </p>
+              <h3>{pageConfig.emptyStateTitle}</h3>
+              <p>{pageConfig.emptyStateBody}</p>
             </section>
           ) : visibleResultSections.length === 0 ? (
             <section className="empty-state">
-              <h3>No issues detected.</h3>
-              <p>The loaded template and environment files are aligned.</p>
+              <h3>{pageConfig.noIssuesTitle}</h3>
+              <p>{pageConfig.noIssuesBody}</p>
             </section>
           ) : (
             <section
@@ -2547,11 +2539,11 @@ function App() {
         <section className="content-grid">
           <section className="faq-section">
             <div className="section-heading">
-              <span className="section-heading__eyebrow">FAQ</span>
-                <h2>How this environment file validator works</h2>
+                <span className="section-heading__eyebrow">FAQ</span>
+                <h2>{pageConfig.faqHeading}</h2>
             </div>
             <div className="faq-list">
-              {faqItems.map((item) => (
+              {pageConfig.faqItems.map((item) => (
                 <article key={item.question} className="faq-item">
                   <h3>{item.question}</h3>
                   <p>{item.answer}</p>

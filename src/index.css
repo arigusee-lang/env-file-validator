@@ -1125,11 +1125,38 @@ a {
   align-items: center;
 }
 
-.workspace-toolbar__hint {
+.workspace-toolbar__lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workspace-toolbar__hint,
+.workspace-toolbar__hint-text {
   color: var(--text-muted);
   font-family: var(--mono);
   font-size: 0.78rem;
   line-height: 1.35;
+}
+
+.workspace-toolbar__upload-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--primary-strong);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.workspace-toolbar__upload-link:hover {
+  color: var(--text);
 }
 
 .workspace-toolbar__actions {
@@ -1575,7 +1602,10 @@ a {
     grid-template-columns: 1fr;
   }
 
-  .workspace-toolbar__hint {
+  .workspace-toolbar__lead,
+  .workspace-toolbar__hint,
+  .workspace-toolbar__hint-text,
+  .workspace-toolbar__upload-link {
     width: 100%;
   }
 

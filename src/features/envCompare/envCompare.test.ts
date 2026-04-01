@@ -21,6 +21,12 @@ describe('env compare core logic', () => {
     expect(parsed.issues.some((issue) => issue.code === 'invalid_key_name')).toBe(true);
   });
 
+  it('reports the offending character for malformed env keys', () => {
+    const parsed = parseEnv(['=broken'].join('\n'), 'env');
+
+    expect(parsed.issues.some((issue) => issue.message.includes('(=)'))).toBe(true);
+  });
+
   it('treats quoted empty env values as warnings, not malformed lines', () => {
     const parsed = parseEnv(['JWT_SECRET=""'].join('\n'), 'env');
 
