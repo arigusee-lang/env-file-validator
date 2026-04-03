@@ -45,6 +45,8 @@ function replaceHeadValue(html, pattern, value) {
 
 for (const route of routes) {
   const { appHtml, head } = render(route.pathname);
+  const isStandaloneStaticPage =
+    route.pathname === '/privacy-policy' || route.pathname === '/contact';
 
   let html = template.replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
 
@@ -94,6 +96,10 @@ for (const route of routes) {
     /<meta\s+name="twitter:image"\s+content="[^"]*"\s*\/>/,
     `<meta name="twitter:image" content="${escapeAttribute(head.ogImageUrl)}" />`,
   );
+
+  if (isStandaloneStaticPage) {
+    html = html.replace(/\s*<script type="module"[^>]*><\/script>/, '');
+  }
 
   await fs.mkdir(path.dirname(route.outputPath), { recursive: true });
   await fs.writeFile(route.outputPath, html);

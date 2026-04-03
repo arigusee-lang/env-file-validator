@@ -103,7 +103,7 @@ type GroupedEnvironmentResult = {
 declare global {
   interface Window {
     googlefc?: {
-      callbackQueue?: Array<Record<string, () => void>>;
+      callbackQueue?: Array<Record<string, () => void> | (() => void)>;
       showRevocationMessage?: () => void;
     };
   }
@@ -1826,7 +1826,15 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
   }
 
   function handleOpenPrivacyChoices() {
-    window.googlefc?.showRevocationMessage?.();
+    const showRevocationMessage = window.googlefc?.showRevocationMessage;
+
+    if (typeof showRevocationMessage !== 'function') {
+      return;
+    }
+
+    window.googlefc = window.googlefc || {};
+    window.googlefc.callbackQueue = window.googlefc.callbackQueue || [];
+    window.googlefc.callbackQueue.push(showRevocationMessage);
   }
 
   function renderWorkspace(fullscreen = false) {
