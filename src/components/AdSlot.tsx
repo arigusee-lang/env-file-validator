@@ -36,16 +36,42 @@ function ensureAdSenseScript(clientId: string): HTMLScriptElement {
 
 export function AdSlot({ slotId, label, className, minHeight = 120 }: AdSlotProps) {
   const clientId = import.meta.env.VITE_ADSENSE_CLIENT;
-  const isConfigured =
+  const hasClientId =
     typeof clientId === 'string' &&
     clientId.length > 0 &&
-    !clientId.includes('xxxxxxxx') &&
+    !clientId.includes('xxxxxxxx');
+  const isConfigured =
+    hasClientId &&
     typeof slotId === 'string' &&
     slotId.length > 0;
   const adInitializedRef = useRef(false);
   const [state, setState] = useState<'placeholder' | 'loading' | 'ready' | 'error'>(
     isConfigured ? 'loading' : 'placeholder',
   );
+
+  useEffect(() => {
+    if (!hasClientId || !clientId) {
+      return;
+    }
+
+    try {
+      const script = ensureAdSenseScript(clientId);
+
+      if (window.__envValidatorAdsScriptLoaded) {
+        return;
+      }
+
+      script.addEventListener(
+        'load',
+        () => {
+          window.__envValidatorAdsScriptLoaded = true;
+        },
+        { once: true },
+      );
+    } catch {
+      // Ignore provider-load failures here; slot-level UI handles actual ad errors.
+    }
+  }, [clientId, hasClientId]);
 
   useEffect(() => {
     if (!isConfigured || !clientId || !slotId || adInitializedRef.current) {
