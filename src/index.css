@@ -974,6 +974,32 @@ a {
   color: var(--primary-strong);
 }
 
+.static-page {
+  display: grid;
+  gap: 14px;
+}
+
+.static-page__nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 2px 0 4px;
+}
+
+.static-page__card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface-card);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.static-page__sections {
+  display: grid;
+  gap: 10px;
+}
+
 .policy-modal {
   position: fixed;
   inset: 0;
@@ -1033,6 +1059,11 @@ a {
 .policy-modal__section h3 {
   margin: 0;
   font-size: 0.96rem;
+}
+
+.policy-modal__section h2 {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .policy-modal__section p {
@@ -1727,7 +1758,8 @@ a {
   .hero,
   .tool-layout,
   .faq-section,
-  .policy-modal__panel {
+  .policy-modal__panel,
+  .static-page__card {
     padding: 12px;
   }
 

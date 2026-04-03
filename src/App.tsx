@@ -27,7 +27,12 @@ import {
   canQuickFixPropertiesText,
   quickFixPropertiesText,
 } from './features/propertiesCompare';
-import { getActiveValidatorPage } from './validatorPageConfig';
+import {
+  getActiveValidatorPage,
+  type ValidatorPageConfig,
+} from './validatorPageConfig';
+import { StaticPage } from './StaticPage';
+import { getStaticPage } from './staticPageConfig';
 
 type ThemeMode = 'light' | 'dark';
 type FullscreenLayoutMode = 'grid' | 'row';
@@ -95,8 +100,6 @@ type GroupedEnvironmentResult = {
   lines: number[];
 };
 
-const pageConfig = getActiveValidatorPage(window.location.pathname);
-
 declare global {
   interface Window {
     googlefc?: {
@@ -106,7 +109,16 @@ declare global {
   }
 }
 
-function upsertMeta(selector: string, attribute: 'name' | 'property', key: string, content: string) {
+function getCurrentPathname() {
+  return typeof window === 'undefined' ? '/' : window.location.pathname;
+}
+
+function upsertMeta(
+  selector: string,
+  attribute: 'name' | 'property',
+  key: string,
+  content: string,
+) {
   let element = document.querySelector<HTMLMetaElement>(selector);
 
   if (!element) {
@@ -118,7 +130,7 @@ function upsertMeta(selector: string, attribute: 'name' | 'property', key: strin
   element.content = content;
 }
 
-function setMetadata() {
+function setMetadata(pageConfig: ValidatorPageConfig) {
   document.title = pageConfig.title;
 
   let description = document.querySelector<HTMLMetaElement>(
@@ -158,6 +170,10 @@ function setMetadata() {
 }
 
 function getInitialTheme(): ThemeMode {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
   const savedTheme = window.localStorage.getItem('env-validator-theme');
 
   if (savedTheme === 'dark' || savedTheme === 'light') {
@@ -171,15 +187,20 @@ function makeId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function getEnvironmentFilename(index: number) {
+function getEnvironmentFilename(index: number, pageConfig: ValidatorPageConfig) {
   return pageConfig.getEnvironmentFilename(index);
 }
 
-function createEnvironment(index: number, text = '', loadedName?: string): EnvironmentTab {
+function createEnvironment(
+  index: number,
+  pageConfig: ValidatorPageConfig,
+  text = '',
+  loadedName?: string,
+): EnvironmentTab {
   return {
     id: makeId('env'),
     label: `Environment ${index}`,
-    filename: loadedName ?? getEnvironmentFilename(index),
+    filename: loadedName ?? getEnvironmentFilename(index, pageConfig),
     loadedName,
     text,
   };
@@ -189,15 +210,18 @@ function getEnvironmentDisplayName(environment: EnvironmentTab) {
   return environment.loadedName ?? environment.label;
 }
 
-function resequenceEnvironments(environments: EnvironmentTab[]) {
+function resequenceEnvironments(
+  environments: EnvironmentTab[],
+  pageConfig: ValidatorPageConfig,
+) {
   return environments.map((environment, index) => ({
     ...environment,
     label: `Environment ${index + 1}`,
-    filename: environment.loadedName ?? getEnvironmentFilename(index + 1),
+    filename: environment.loadedName ?? getEnvironmentFilename(index + 1, pageConfig),
   }));
 }
 
-function isPreferredTemplateFilename(filename: string) {
+function isPreferredTemplateFilename(filename: string, pageConfig: ValidatorPageConfig) {
   return pageConfig.isPreferredTemplateFilename(filename);
 }
 
@@ -741,8 +765,8 @@ function buildEnvironmentWarningItems(
   );
 }
 
-function App() {
-  const [initialEnvironment] = useState<EnvironmentTab>(() => createEnvironment(1));
+function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
+  const [initialEnvironment] = useState<EnvironmentTab>(() => createEnvironment(1, pageConfig));
   const fullscreenGridRef = useRef<HTMLDivElement>(null);
   const fullscreenRowRef = useRef<HTMLDivElement>(null);
   const workspaceModalRef = useRef<HTMLDivElement>(null);
@@ -754,7 +778,6 @@ function App() {
   const [renameDraft, setRenameDraft] = useState('');
   const [hoveredLines, setHoveredLines] = useState<HoverTarget>(() => buildHoverTarget());
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
-  const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState(false);
   const [isPrivacyChoicesAvailable, setIsPrivacyChoicesAvailable] = useState(false);
   const [fullscreenLayout, setFullscreenLayout] = useState<FullscreenLayoutMode>('grid');
   const [fullscreenColumnRatio, setFullscreenColumnRatio] = useState(50);
@@ -774,8 +797,8 @@ function App() {
   }
 
   useEffect(() => {
-    setMetadata();
-  }, []);
+    setMetadata(pageConfig);
+  }, [pageConfig]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -1392,7 +1415,7 @@ function App() {
 
     const fileEntries = await readDroppedFiles(files);
     const templateIndex = fileEntries.findIndex((entry) =>
-      isPreferredTemplateFilename(entry.file.name),
+      isPreferredTemplateFilename(entry.file.name, pageConfig),
     );
     const selectedTemplateIndex = templateIndex >= 0 ? templateIndex : 0;
     const templateEntry = fileEntries[selectedTemplateIndex];
@@ -1407,9 +1430,9 @@ function App() {
       const nextEnvironments =
         environmentEntries.length > 0
           ? environmentEntries.map((entry, index) =>
-              createEnvironment(index + 1, entry.text, entry.file.name),
+              createEnvironment(index + 1, pageConfig, entry.text, entry.file.name),
             )
-          : [createEnvironment(1)];
+          : [createEnvironment(1, pageConfig)];
 
       setEnvironments(nextEnvironments);
     });
@@ -1546,7 +1569,7 @@ function App() {
       return;
     }
 
-    const nextEnvironment = createEnvironment(environments.length + 1);
+    const nextEnvironment = createEnvironment(environments.length + 1, pageConfig);
 
     setEnvironments((current) => [...current, nextEnvironment]);
     setStatusMessage(`${nextEnvironment.label} added.`);
@@ -1567,6 +1590,7 @@ function App() {
               text: '',
               filename: getEnvironmentFilename(
                 Number.parseInt(environment.label.replace('Environment ', ''), 10),
+                pageConfig,
               ),
               loadedName: undefined,
             }
@@ -1588,6 +1612,7 @@ function App() {
     setEnvironments((current) =>
       resequenceEnvironments(
         current.filter((environment) => environment.id !== environmentId),
+        pageConfig,
       ),
     );
 
@@ -1640,7 +1665,7 @@ function App() {
   }
 
   function handleClearAll() {
-    const resetEnvironments = [createEnvironment(1)];
+    const resetEnvironments = [createEnvironment(1, pageConfig)];
 
     setTemplateText('');
     setTemplateLoadedName(null);
@@ -1652,7 +1677,7 @@ function App() {
 
   function handleLoadDemo() {
     const demoEnvironments = pageConfig.demoEnvironmentTexts.map((text, index) =>
-      createEnvironment(index + 1, text, pageConfig.demoEnvironmentFilenames[index]),
+      createEnvironment(index + 1, pageConfig, text, pageConfig.demoEnvironmentFilenames[index]),
     );
 
     setTemplateText(pageConfig.demoTemplate);
@@ -2312,81 +2337,6 @@ function App() {
         </div>
       ) : null}
 
-      {isPrivacyPolicyOpen ? (
-        <div
-          className="policy-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="privacy-policy-title"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setIsPrivacyPolicyOpen(false);
-            }
-          }}
-        >
-          <div className="policy-modal__panel">
-            <div className="policy-modal__header">
-              <div>
-                <p className="policy-modal__eyebrow">Privacy</p>
-                <h2 id="privacy-policy-title">Privacy Policy</h2>
-              </div>
-              <button
-                type="button"
-                className="theme-toggle"
-                onClick={() => setIsPrivacyPolicyOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="policy-modal__content">
-              <section className="policy-modal__section">
-                <h3>Local processing</h3>
-                <p>
-                  Env text pasted into this validator is parsed and compared locally in your
-                  browser. The core validation flow does not require an account or server-side file
-                  upload.
-                </p>
-              </section>
-
-              <section className="policy-modal__section">
-                <h3>Advertising</h3>
-                <p>
-                  This site may use Google AdSense to display ads. Google may use cookies or
-                  similar technologies to measure ads, prevent fraud, and serve advertising content
-                  depending on region-specific requirements and the choices a visitor makes.
-                </p>
-              </section>
-
-              <section className="policy-modal__section">
-                <h3>Consent and privacy choices</h3>
-                <p>
-                  Where required, consent and privacy choices are handled through Google Funding
-                  Choices. If a privacy settings link is shown on this page, you can use it to
-                  review or update your advertising choices.
-                </p>
-              </section>
-
-              <section className="policy-modal__section">
-                <h3>Third-party services</h3>
-                <p>
-                  Google may act as a third-party advertising and privacy messaging provider. Review
-                  Google&apos;s policies for details about how Google processes advertising data.
-                </p>
-              </section>
-
-              <section className="policy-modal__section">
-                <h3>Launch note</h3>
-                <p>
-                  This draft policy is intended for envvalidator.com. Before production ads go
-                  live, replace it with your final publisher name and contact details.
-                </p>
-              </section>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       <div className="page-shell">
         <header className="hero">
           <div className="hero__headline">
@@ -2400,6 +2350,7 @@ function App() {
               <button
                 type="button"
                 className="theme-toggle"
+                suppressHydrationWarning
                 onClick={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
               >
                 {theme === 'light' ? 'Dark theme' : 'Light theme'}
@@ -2561,13 +2512,18 @@ function App() {
         </section>
 
         <footer className="site-footer">
-          <button
-            type="button"
+          <a
             className="site-footer__link"
-            onClick={() => setIsPrivacyPolicyOpen(true)}
+            href={pageConfig.id === 'properties' ? '/' : '/properties-file-validator'}
           >
+            {pageConfig.id === 'properties' ? 'Env validator' : 'Properties validator'}
+          </a>
+          <a className="site-footer__link" href="/privacy-policy">
             Privacy Policy
-          </button>
+          </a>
+          <a className="site-footer__link" href="/contact">
+            Contact
+          </a>
           {isPrivacyChoicesAvailable ? (
             <button
               type="button"
@@ -2581,6 +2537,17 @@ function App() {
       </div>
     </>
   );
+}
+
+function App({ pathname }: { pathname?: string }) {
+  const resolvedPathname = pathname ?? getCurrentPathname();
+  const staticPage = getStaticPage(resolvedPathname);
+
+  if (staticPage) {
+    return <StaticPage page={staticPage} />;
+  }
+
+  return <ValidatorApp pageConfig={getActiveValidatorPage(resolvedPathname)} />;
 }
 
 export default App;
