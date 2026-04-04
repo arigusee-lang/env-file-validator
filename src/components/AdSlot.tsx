@@ -15,21 +15,23 @@ declare global {
 }
 
 const ADSENSE_SRC = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
+const ADSENSE_SCRIPT_ID = 'env-validator-adsense-loader';
 
 function ensureAdSenseScript(clientId: string): HTMLScriptElement {
-  const existing = document.querySelector<HTMLScriptElement>(
-    'script[data-adsense-script="true"]',
-  );
+  const existing = document.getElementById(ADSENSE_SCRIPT_ID) as HTMLScriptElement | null;
 
   if (existing) {
+    if (typeof window.adsbygoogle !== 'undefined') {
+      window.__envValidatorAdsScriptLoaded = true;
+    }
     return existing;
   }
 
   const script = document.createElement('script');
+  script.id = ADSENSE_SCRIPT_ID;
   script.async = true;
   script.crossOrigin = 'anonymous';
   script.src = `${ADSENSE_SRC}?client=${clientId}`;
-  script.dataset.adsenseScript = 'true';
   document.head.appendChild(script);
   return script;
 }
@@ -57,7 +59,8 @@ export function AdSlot({ slotId, label, className, minHeight = 120 }: AdSlotProp
     try {
       const script = ensureAdSenseScript(clientId);
 
-      if (window.__envValidatorAdsScriptLoaded) {
+      if (window.__envValidatorAdsScriptLoaded || typeof window.adsbygoogle !== 'undefined') {
+        window.__envValidatorAdsScriptLoaded = true;
         return;
       }
 
@@ -92,7 +95,8 @@ export function AdSlot({ slotId, label, className, minHeight = 120 }: AdSlotProp
         }
       };
 
-      if (window.__envValidatorAdsScriptLoaded) {
+      if (window.__envValidatorAdsScriptLoaded || typeof window.adsbygoogle !== 'undefined') {
+        window.__envValidatorAdsScriptLoaded = true;
         markReady();
         return;
       }

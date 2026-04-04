@@ -98,6 +98,10 @@ for (const route of routes) {
   );
 
   if (isStandaloneStaticPage) {
+    html = html.replace(
+      /\s*<script\s+id="env-validator-adsense-loader"[\s\S]*?<\/script>/,
+      '',
+    );
     html = html.replace(/\s*<script type="module"[^>]*><\/script>/, '');
   }
 
