@@ -15,7 +15,7 @@ export type StaticPageConfig = {
 };
 
 const SITE_URL = 'https://envvalidator.com';
-const SHARED_OG_IMAGE = `${SITE_URL}/og-image.svg`;
+const SHARED_OG_IMAGE = `${SITE_URL}/og-image.png`;
 const CONTACT_EMAIL = 'arigusee@gmail.com';
 
 export const privacyPageConfig: StaticPageConfig = {

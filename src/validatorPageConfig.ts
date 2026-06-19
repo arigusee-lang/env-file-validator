@@ -64,7 +64,7 @@ export type ValidatorPageConfig = {
 };
 
 const SITE_URL = 'https://envvalidator.com';
-const SHARED_OG_IMAGE = `${SITE_URL}/og-image.svg`;
+const SHARED_OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 function toKebabFileStem(label: string) {
   const normalized = label
