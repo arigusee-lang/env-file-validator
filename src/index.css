@@ -952,6 +952,14 @@ a {
   gap: 10px;
 }
 
+.static-page__cta {
+  margin-top: 6px;
+}
+
+.static-page__cta .button {
+  text-decoration: none;
+}
+
 .policy-modal {
   position: fixed;
   inset: 0;

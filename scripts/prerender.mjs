@@ -9,23 +9,28 @@ const ssrEntryPath = path.join(rootDir, 'dist-ssr', 'entry-server.js');
 const { render } = await import(pathToFileURL(ssrEntryPath).href);
 const template = await fs.readFile(path.join(distDir, 'index.html'), 'utf8');
 
+// Static content pages (privacy, contact, and guide articles) are pure HTML
+// and ship without the client JS bundle. The validator pages ('/' and
+// '/properties-file-validator') keep the bundle because they are interactive.
+const staticContentPaths = [
+  '/privacy-policy',
+  '/contact',
+  '/how-to-validate-env-file',
+  '/env-vs-env-example',
+  '/compare-env-files',
+  '/common-env-file-mistakes',
+];
+
 const routes = [
-  {
-    pathname: '/',
-    outputPath: path.join(distDir, 'index.html'),
-  },
-  {
-    pathname: '/privacy-policy',
-    outputPath: path.join(distDir, 'privacy-policy', 'index.html'),
-  },
-  {
-    pathname: '/contact',
-    outputPath: path.join(distDir, 'contact', 'index.html'),
-  },
+  { pathname: '/', outputPath: path.join(distDir, 'index.html') },
   {
     pathname: '/properties-file-validator',
     outputPath: path.join(distDir, 'properties-file-validator', 'index.html'),
   },
+  ...staticContentPaths.map((pathname) => ({
+    pathname,
+    outputPath: path.join(distDir, pathname.replace(/^\//, ''), 'index.html'),
+  })),
 ];
 
 function escapeHtml(value) {
@@ -45,8 +50,7 @@ function replaceHeadValue(html, pattern, value) {
 
 for (const route of routes) {
   const { appHtml, head } = render(route.pathname);
-  const isStandaloneStaticPage =
-    route.pathname === '/privacy-policy' || route.pathname === '/contact';
+  const isStandaloneStaticPage = staticContentPaths.includes(route.pathname);
 
   let html = template.replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
 

@@ -1,6 +1,11 @@
+import { articlePages } from './articlePages';
+
 export type StaticPageConfig = {
-  id: 'privacy' | 'contact';
-  routePath: '/privacy-policy' | '/contact';
+  id: string;
+  routePath: string;
+  kind?: 'page' | 'article';
+  navLabel?: string;
+  updatedAt?: string;
   title: string;
   description: string;
   canonicalUrl: string;
@@ -12,6 +17,10 @@ export type StaticPageConfig = {
     title: string;
     body: string[];
   }>;
+  cta?: {
+    label: string;
+    href: string;
+  };
 };
 
 const SITE_URL = 'https://envvalidator.com';
@@ -104,7 +113,11 @@ export const contactPageConfig: StaticPageConfig = {
   ],
 };
 
-const staticPages = [privacyPageConfig, contactPageConfig] as const;
+const staticPages: StaticPageConfig[] = [
+  privacyPageConfig,
+  contactPageConfig,
+  ...articlePages,
+];
 
 export function getStaticPage(pathname: string) {
   return staticPages.find((page) => pathname === page.routePath) ?? null;

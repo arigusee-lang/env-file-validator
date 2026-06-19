@@ -32,6 +32,7 @@ import {
 } from './validatorPageConfig';
 import { StaticPage } from './StaticPage';
 import { getStaticPage } from './staticPageConfig';
+import { articlePages } from './articlePages';
 
 type ThemeMode = 'light' | 'dark';
 type FullscreenLayoutMode = 'grid' | 'row';
@@ -2472,6 +2473,11 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
           >
             {pageConfig.id === 'properties' ? 'Env validator' : 'Properties validator'}
           </a>
+          {articlePages.map((article) => (
+            <a key={article.routePath} className="site-footer__link" href={article.routePath}>
+              {article.navLabel ?? article.heading}
+            </a>
+          ))}
           <a className="site-footer__link" href="/privacy-policy">
             Privacy Policy
           </a>
