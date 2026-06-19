@@ -26,10 +26,6 @@ jobs:
     env:
       CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
       DEPLOY_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}
-      VITE_ADSENSE_CLIENT: ${{ vars.VITE_ADSENSE_CLIENT || 'ca-pub-3028555474940525' }}
-      VITE_ADSENSE_SLOT_A: ${{ vars.VITE_ADSENSE_SLOT_A }}
-      VITE_ADSENSE_SLOT_B: ${{ vars.VITE_ADSENSE_SLOT_B }}
-      VITE_ADSENSE_SLOT_C: ${{ vars.VITE_ADSENSE_SLOT_C }}
 
     steps:
       - name: Validate required configuration

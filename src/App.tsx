@@ -10,7 +10,6 @@ import {
   type ReactNode,
   type WheelEvent,
 } from 'react';
-import { AdSlot } from './components/AdSlot';
 import {
   EnvTextEditor,
   type EditorHoverTarget,
@@ -99,15 +98,6 @@ type GroupedEnvironmentResult = {
   filename: string;
   lines: number[];
 };
-
-declare global {
-  interface Window {
-    googlefc?: {
-      callbackQueue?: Array<Record<string, () => void> | (() => void)>;
-      showRevocationMessage?: () => void;
-    };
-  }
-}
 
 function getCurrentPathname() {
   return typeof window === 'undefined' ? '/' : window.location.pathname;
@@ -778,7 +768,6 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
   const [renameDraft, setRenameDraft] = useState('');
   const [hoveredLines, setHoveredLines] = useState<HoverTarget>(() => buildHoverTarget());
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(false);
-  const [isPrivacyChoicesAvailable, setIsPrivacyChoicesAvailable] = useState(false);
   const [fullscreenLayout, setFullscreenLayout] = useState<FullscreenLayoutMode>('grid');
   const [fullscreenColumnRatio, setFullscreenColumnRatio] = useState(50);
   const [fullscreenRowRatio, setFullscreenRowRatio] = useState(50);
@@ -804,18 +793,6 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem('env-validator-theme', theme);
   }, [theme]);
-
-  useEffect(() => {
-    window.googlefc = window.googlefc || {};
-    window.googlefc.callbackQueue = window.googlefc.callbackQueue || [];
-    window.googlefc.callbackQueue.push({
-      CONSENT_API_READY: () => {
-        setIsPrivacyChoicesAvailable(
-          typeof window.googlefc?.showRevocationMessage === 'function',
-        );
-      },
-    });
-  }, []);
 
   useEffect(() => {
     document.documentElement.style.overflow = isWorkspaceExpanded ? 'hidden' : '';
@@ -1825,18 +1802,6 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
     modal.scrollTop += event.deltaY;
   }
 
-  function handleOpenPrivacyChoices() {
-    const showRevocationMessage = window.googlefc?.showRevocationMessage;
-
-    if (typeof showRevocationMessage !== 'function') {
-      return;
-    }
-
-    window.googlefc = window.googlefc || {};
-    window.googlefc.callbackQueue = window.googlefc.callbackQueue || [];
-    window.googlefc.callbackQueue.push(showRevocationMessage);
-  }
-
   function renderWorkspace(fullscreen = false) {
     const widgetCount = parsedEnvironments.length + 1;
     const workspaceHintText = pageConfig.workspaceHint.replace(/\.$/, '');
@@ -2367,12 +2332,6 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
           </div>
         </header>
 
-        <AdSlot
-          label="Top banner"
-          slotId={import.meta.env.VITE_ADSENSE_SLOT_A}
-          minHeight={44}
-        />
-
         <main className="tool-layout">
           {!isWorkspaceExpanded ? renderWorkspace() : null}
 
@@ -2489,12 +2448,6 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
           )}
         </main>
 
-        <AdSlot
-          label="Results banner"
-          slotId={import.meta.env.VITE_ADSENSE_SLOT_B}
-          minHeight={52}
-        />
-
         <section className="content-grid">
           <section className="faq-section">
             <div className="section-heading">
@@ -2510,13 +2463,6 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
               ))}
             </div>
           </section>
-
-          <AdSlot
-            className="ad-slot--sidebar"
-            label="Sidebar slot"
-            slotId={import.meta.env.VITE_ADSENSE_SLOT_C}
-            minHeight={132}
-          />
         </section>
 
         <footer className="site-footer">
@@ -2532,15 +2478,6 @@ function ValidatorApp({ pageConfig }: { pageConfig: ValidatorPageConfig }) {
           <a className="site-footer__link" href="/contact">
             Contact
           </a>
-          {isPrivacyChoicesAvailable ? (
-            <button
-              type="button"
-              className="site-footer__link"
-              onClick={handleOpenPrivacyChoices}
-            >
-              Privacy &amp; cookie settings
-            </button>
-          ) : null}
         </footer>
       </div>
     </>

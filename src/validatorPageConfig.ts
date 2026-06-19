@@ -103,17 +103,22 @@ function propertiesTemplateMatcher(filename: string) {
 export const envPageConfig: ValidatorPageConfig = {
   id: 'env',
   routePath: '/',
-  title: '.env File Validator - Compare .env Files Against .env.example',
+  title: '.env File Validator & Compare Tool - Diff .env Against .env.example',
   description:
-    'Validate .env.local, .env.dev, .env.qa, and .env.prod against your .env.example template. Find missing keys, extra keys, duplicates, malformed lines, and warnings in the browser.',
+    'Validate, compare, and diff .env files in the browser. Check .env.local, .env.dev, .env.qa, and .env.prod against your .env.example template to find missing keys, extra keys, duplicates, and malformed lines.',
   canonicalUrl: `${SITE_URL}/`,
   ogImageUrl: SHARED_OG_IMAGE,
-  softwareApplicationName: 'Env File Validator',
-  heroTitle: 'Validate multiple `.env` files against one `.env.example` template.',
+  softwareApplicationName: 'Env File Validator & Compare Tool',
+  heroTitle: 'Validate, compare, and diff `.env` files against one `.env.example` template.',
   heroLede:
-    'Check whether `.env.local`, `.env.dev`, `.env.qa`, and `.env.prod` match the keys documented in your reference template.',
+    'Compare `.env.local`, `.env.dev`, `.env.qa`, and `.env.prod` against your reference template to see exactly which keys are missing, extra, or different.',
   faqHeading: 'How this environment file validator works',
   faqItems: [
+    {
+      question: 'Can I use this to compare or diff two .env files?',
+      answer:
+        'Yes. Load one file as the reference template and the others as environments to diff them key by key. The tool highlights which keys are missing, extra, duplicated, or differently defined across every file.',
+    },
     {
       question: 'Does this tool upload any environment files?',
       answer: 'No. Parsing, validation, and comparison all happen locally in the browser.',
